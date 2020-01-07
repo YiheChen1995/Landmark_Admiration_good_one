@@ -5,7 +5,7 @@ classdef LM_Proposal < handle
           %------------/module_&_debugging_parameters-------------------------
            DBG_new_landmarks  %[Debug Only] a structure that contains new landmarks  
            CTRL_MAX_Landmarks= 5  %[Module Parameter] controls the max number of landmarks to be added at each epoch, 5 by default
-           
+           INITIAL_LOCATIONS = [];
            
            LMP_n_L_k % number of expected extracted landmarks
            LMP_n_k   % number of expected measurements
@@ -44,13 +44,28 @@ classdef LM_Proposal < handle
               else
                 %%  ---------under costruction------------
                  for lm_i = 1:obj.CTRL_MAX_Landmarks % try different landmark number until it reaches the max
-                    % construct the initial condition
+                    %---------------------------------
+                     % construct the initial condition
                      new_landmarks_0 = [];
+                     tmp_map = estimator.landmark_map;
                      for x0_i = 1:lm_i
+                         %------optimize on separateness-----
                          rand_dir=(rand*2)-1;
-                         new_landmarks_0 = [new_landmarks_0; estimator.x_true(1)+(params.lidarRange-2)*cos(2*pi*x0_i/lm_i+rand_dir*pi),estimator.x_true(2)+(params.lidarRange-2)*sin(2*pi*x0_i/lm_i+rand_dir*pi)]
+                         init_init = [estimator.x_true(1)+(params.lidarRange-8)*cos(2*pi*x0_i/lm_i+rand_dir*pi),...
+                              estimator.x_true(2)+(params.lidarRange-8)*sin(2*pi*x0_i/lm_i+rand_dir*pi)];
+                         [init_pose,distance] = fmincon(@(posi) find_farest_point(posi,tmp_map),init_init,...
+                             [],[],[],[],[],[],...
+                             @(posi) constraints(obj,im,params,estimator,[estimator.x_true(1),estimator.x_true(2),estimator.x_true(3)],posi));
+                         tmp_map = [tmp_map;init_pose];   
+                         obj.INITIAL_LOCATIONS = [obj.INITIAL_LOCATIONS; init_pose];
+                         %-----------------------------------     
+                         
+                         new_landmarks_0 = [new_landmarks_0;init_pose];%...
+                             %estimator.x_true(1)+(params.lidarRange-2)*cos(2*pi*x0_i/lm_i+rand_dir*pi),...
+                             %estimator.x_true(2)+(params.lidarRange-2)*sin(2*pi*x0_i/lm_i+rand_dir*pi)]
                      end
-                     
+                     % end of the initial condition
+                     %-----------------------------
                     %opt====!!!IMPORTANT!!!===============================
                      para_x0 = new_landmarks_0;
                      para_A = [];
